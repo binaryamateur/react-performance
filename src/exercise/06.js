@@ -13,6 +13,8 @@ import {
 const AppStateContext = React.createContext()
 const AppDispatchContext = React.createContext()
 
+const DogNameContext = React.createContext()
+
 const initialGrid = Array.from({length: 100}, () =>
   Array.from({length: 100}, () => Math.random() * 100),
 )
@@ -42,10 +44,15 @@ function AppProvider({children}) {
     dogName: '',
     grid: initialGrid,
   })
+
+  const [dogName, setDogName] = React.useState({dogName: ''})
+
   return (
     <AppStateContext.Provider value={state}>
       <AppDispatchContext.Provider value={dispatch}>
-        {children}
+        <DogNameContext.Provider value={[dogName, setDogName]}>
+          {children}
+        </DogNameContext.Provider>
       </AppDispatchContext.Provider>
     </AppStateContext.Provider>
   )
@@ -63,6 +70,14 @@ function useAppDispatch() {
   const context = React.useContext(AppDispatchContext)
   if (!context) {
     throw new Error('useAppDispatch must be used within the AppProvider')
+  }
+  return context
+}
+
+function useDogName() {
+  const context = React.useContext(DogNameContext)
+  if (!context) {
+    throw new Error('useDogName must be used within the AppProvider')
   }
   return context
 }
@@ -85,10 +100,30 @@ function Grid() {
 }
 Grid = React.memo(Grid)
 
-function Cell({row, column}) {
-  const state = useAppState()
-  const cell = state.grid[row][column]
+// function Cell({row, column}) {
+//   const state = useAppState()
+//   const cell = React.useMemo(() => {
+//     return state.grid[row][column]
+//   }, [state, row, column])
+//   return <CellImpl cell={cell} row={row} column={column}></CellImpl>
+// }
+
+function withStateSlice(Comp, slice) {
+  const MemoComp = React.memo(Comp)
+  return function Wrapper(props) {
+    const state = useAppState()
+    return <MemoComp state={slice(state, props)} {...props}></MemoComp>
+  }
+}
+
+const Cell = withStateSlice(
+  CellImpl,
+  (state, {row, column}) => state.grid[row][column],
+)
+
+function CellImpl({state: cell, row, column}) {
   const dispatch = useAppDispatch()
+
   const handleClick = () => dispatch({type: 'UPDATE_GRID_CELL', row, column})
   return (
     <button
@@ -103,13 +138,14 @@ function Cell({row, column}) {
     </button>
   )
 }
-Cell = React.memo(Cell)
+
+CellImpl = React.memo(CellImpl)
 
 function DogNameInput() {
   // 🐨 replace the useAppState and useAppDispatch with a normal useState here
   // to manage the dogName locally within this component
-  const state = useAppState()
-  const dispatch = useAppDispatch()
+  const [state, dispatch] = useDogName()
+
   const {dogName} = state
 
   function handleChange(event) {
